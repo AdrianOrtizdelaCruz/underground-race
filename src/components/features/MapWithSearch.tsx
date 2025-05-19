@@ -3,120 +3,134 @@
 import { useState, useEffect } from 'react';
 import AddressSearch from './AddressSearch';
 import MapComponent from './map-component';
-import { Place } from '@/services/geo';
+import type { Place } from '@/services/geo';
+
+export interface LocationExtended extends Place {
+  time: string;
+  description: string;
+  link: string;
+}
 
 interface MapWithSearchProps {
-  initialLocations: (Place & { time: string; description: string; link: string })[];
-  onAddLocation: (newLoc: Place & { time: string; description: string; link: string }) => void;
+  initialLocations: LocationExtended[];
+  onAddLocation: (newLoc: LocationExtended) => void;
+  onRemoveLocation: (index: number) => void;
 }
 
 export default function MapWithSearch({
   initialLocations,
   onAddLocation,
+  onRemoveLocation,
 }: MapWithSearchProps) {
-  const [locations, setLocations] = useState<(Place & { time: string; description: string; link: string })[]>([]);
+  // Solo guardamos aquí las ubicaciones que añada el usuario
+  const [customLocations, setCustomLocations] = useState<LocationExtended[]>([]);
 
-  // Estado para la ubicación recién seleccionada en AddressSearch
-  const [pendingLocation, setPendingLocation] = useState<{
-    lat: number;
-    lng: number;
-    name: string;
-  } | null>(null);
-
-  // Campos para la hora, descripción y link que el usuario pone antes de añadir
+  const [pending, setPending] = useState<Place | null>(null);
   const [time, setTime] = useState('');
   const [description, setDescription] = useState('');
   const [link, setLink] = useState('');
 
-  useEffect(() => {
-    setLocations(initialLocations);
-  }, [initialLocations]);
-
-  // Cuando seleccionan ubicación en AddressSearch
-  const handleLocationSelected = (lat: number, lon: number, name: string) => {
-    setPendingLocation({ lat, lng: lon, name });
+  // Cuando AddressSearch devuelve lat/lng y name
+  const handleLocationSelected = (lat: number, lng: number, name: string) => {
+    setPending({ name, location: { lat, lng } });
     setTime('');
     setDescription('');
     setLink('');
   };
 
-  // Cuando el usuario confirma añadir la ubicación con info extra
-  const handleAddLocation = () => {
-    if (!pendingLocation) return;
-    if (!link.trim()) {
-      alert('Por favor, añade un link válido');
+  // Añadir una nueva ubicación
+  const handleAdd = () => {
+    if (!pending || !link.trim()) {
+      alert('Por favor, completa todos los campos.');
       return;
     }
-
-    const newLocation = {
-      name: pendingLocation.name,
-      location: { lat: pendingLocation.lat, lng: pendingLocation.lng },
+    const newLoc: LocationExtended = {
+      name: pending.name,
+      location: { ...pending.location },
       time: time || 'Hora no definida',
       description: description || 'Sin descripción',
       link: link.trim(),
     };
-
-    setLocations((prev) => [...prev, newLocation]);
-    onAddLocation(newLocation);
-
-    // Reset
-    setPendingLocation(null);
-    setTime('');
-    setDescription('');
-    setLink('');
+    setCustomLocations((prev) => [...prev, newLoc]);
+    onAddLocation(newLoc);
+    setPending(null);
   };
 
+  // Eliminar únicamente de customLocations
+  const handleMarkerClick = (combinedIndex: number) => {
+    const initialCount = initialLocations.length;
+    // Si clicas en una inicial, no hacemos nada
+    if (combinedIndex < initialCount) return;
+    // Si clicas en una custom, la borramos
+    const customIndex = combinedIndex - initialCount;
+    setCustomLocations((prev) => {
+      const updated = prev.filter((_, i) => i !== customIndex);
+      onRemoveLocation(customIndex);
+      return updated;
+    });
+  };
+
+  // Combina para pasar al mapa
+  const allLocations: LocationExtended[] = [
+    ...initialLocations,
+    ...customLocations,
+  ];
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 h-full">
       <AddressSearch onLocationSelected={handleLocationSelected} />
 
-      {/* Mostrar formulario solo si hay ubicación pendiente */}
-      {pendingLocation && (
+      {pending && (
         <div className="flex flex-col gap-2 border rounded p-4 bg-gray-50">
-          <p className="font-semibold">Añadir información para: {pendingLocation.name}</p>
+          <p className="font-semibold">Información para: {pending.name}</p>
 
           <label className="text-sm font-medium">Hora</label>
           <input
             type="text"
-            className="rounded border px-3 py-1 text-black bg-white"
-            placeholder="Ej: Sáb 10:00 PM"
+            className="rounded border px-3 py-1"
             value={time}
             onChange={(e) => setTime(e.target.value)}
+            placeholder="Ej: Sáb 10:00 PM"
           />
 
           <label className="text-sm font-medium">Descripción</label>
           <input
             type="text"
-            className="rounded border px-3 py-1 text-black bg-white"
-            placeholder="Ej: Encuentro en parking del centro"
+            className="rounded border px-3 py-1"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            placeholder="Ej: Encuentro en parking"
           />
 
-          <label className="text-sm font-medium">Link de la ubicación</label>
+          <label className="text-sm font-medium">Link</label>
           <input
             type="url"
-            className="rounded border px-3 py-1 text-black bg-white"
-            placeholder="Ej: https://maps.app.goo.gl/abc123"
+            className="rounded border px-3 py-1"
             value={link}
             onChange={(e) => setLink(e.target.value)}
+            placeholder="https://maps.app.goo.gl/..."
           />
 
           <button
-            onClick={handleAddLocation}
-            className="mt-3 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            onClick={handleAdd}
+            className="mt-3 bg-blue-600 text-white px-4 py-2 rounded"
           >
             Añadir ubicación
           </button>
         </div>
       )}
 
-      <div style={{ height: '400px' }}>
-        <MapComponent locations={locations} />
+      <div className="h-[100%]">
+        <MapComponent
+          locations={allLocations}
+          onMarkerClick={handleMarkerClick}
+        />
       </div>
     </div>
   );
 }
+
+
 
 
 

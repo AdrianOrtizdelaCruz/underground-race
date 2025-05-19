@@ -1,5 +1,4 @@
-// src/components/features/map-component.tsx
-"use client";
+'use client';
 
 import { useState, useEffect } from 'react';
 import type { Place } from '@/services/geo';
@@ -7,19 +6,28 @@ import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Terminal } from 'lucide-react';
 
+export interface LocationWithMeta extends Place {
+  time?: string;
+  description?: string;
+}
+
 interface MapComponentProps {
-  locations: (Place & { time?: string; description?: string })[]; // Allow optional properties
+  locations: LocationWithMeta[];
+  onMarkerClick?: (index: number) => void;
 }
 
 const SANTANDER_CENTER = { lat: 43.4623, lng: -3.8099 };
 const DEFAULT_ZOOM = 12;
 
-export default function MapComponent({ locations }: MapComponentProps) {
+export default function MapComponent({
+  locations,
+  onMarkerClick,
+}: MapComponentProps) {
   const [isClient, setIsClient] = useState(false);
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
   useEffect(() => {
-    setIsClient(true); // Ensure this runs only on the client
+    setIsClient(true);
   }, []);
 
   if (!isClient) {
@@ -49,25 +57,25 @@ export default function MapComponent({ locations }: MapComponentProps) {
     <div className="h-full w-full overflow-hidden rounded-md border">
       <APIProvider apiKey={apiKey}>
         <Map
-          mapId={'underground-rides-map'} // Optional: for custom map styling
+          mapId="underground-rides-map"
           style={{ width: '100%', height: '100%' }}
-          defaultCenter={SANTANDER_CENTER}
+          defaultCenter={locations[0]?.location || SANTANDER_CENTER}
           defaultZoom={DEFAULT_ZOOM}
-          gestureHandling={'greedy'} // Allows easier map interaction
-          disableDefaultUI={true} // Optional: removes default controls if desired
+          gestureHandling="greedy"
+          disableDefaultUI
         >
-          {locations.map((loc) => (
+          {locations.map((loc, i) => (
             <AdvancedMarker
-              key={loc.name}
+              key={`${loc.name}-${i}`}
               position={loc.location}
-              title={loc.name} // Tooltip on hover
-            >
-              {/* Optional: Custom marker icon */}
-              {/* <span style={{ fontSize: '1.5rem' }}>📍</span> */}
-            </AdvancedMarker>
+              title={loc.name}
+              onClick={() => onMarkerClick?.(i)}
+            />
           ))}
         </Map>
       </APIProvider>
     </div>
   );
 }
+
+

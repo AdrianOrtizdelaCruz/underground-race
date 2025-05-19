@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 interface AddressSearchProps {
-  onLocationSelected: (lat: number, lon: number, name: string) => void;
+  onLocationSelected: (lat: number, lng: number, name: string) => void;
 }
 
 export default function AddressSearch({ onLocationSelected }: AddressSearchProps) {
@@ -18,28 +18,28 @@ export default function AddressSearch({ onLocationSelected }: AddressSearchProps
       return;
     }
 
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      setError('Falta la clave de API de Google Maps');
+      return;
+    }
+
     setLoading(true);
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`
+      const res = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`
       );
 
-      if (!response.ok) {
-        throw new Error('Error en la respuesta de búsqueda');
-      }
+      const data = await res.json();
 
-      const data = await response.json();
-
-      if (!Array.isArray(data) || data.length === 0) {
-        setError('No se encontró ninguna ubicación para esa dirección');
+      if (data.status !== 'OK' || data.results.length === 0) {
+        setError('No se encontró ninguna ubicación');
       } else {
-        const place = data[0];
-        if (!place.lat || !place.lon) {
-          setError('Datos de ubicación incompletos');
-        } else {
-          onLocationSelected(parseFloat(place.lat), parseFloat(place.lon), address);
-          setAddress(''); // limpia input al añadir
-        }
+        const result = data.results[0];
+        const { lat, lng } = result.geometry.location;
+        const formattedName = result.formatted_address;
+        onLocationSelected(lat, lng, formattedName);
+        setAddress('');
       }
     } catch (err) {
       setError('Error al buscar la ubicación');
@@ -54,7 +54,7 @@ export default function AddressSearch({ onLocationSelected }: AddressSearchProps
         type="text"
         value={address}
         onChange={(e) => setAddress(e.target.value)}
-        placeholder="Escribe una dirección o lugar"
+        placeholder="Escribe una dirección"
         className="border px-3 py-2 rounded w-full text-black"
       />
       <button
@@ -68,6 +68,8 @@ export default function AddressSearch({ onLocationSelected }: AddressSearchProps
     </div>
   );
 }
+
+
 
 
 
